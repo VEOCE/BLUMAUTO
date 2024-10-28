@@ -560,13 +560,6 @@ async def get_data(data_file, proxy_file):
 async def main():
     init()
     banner = f"""{Fore.GREEN}
-╔═══════════════════════════════════════════╗
-║              Bot Automation               ║
-║         Developed by @UxAirdrops          ║
-║     Join here : https://t.me/UxScript     ║
-╚═══════════════════════════════════════════╝
-Donate here : Binance Id : 710691663
-              Dana/gopay : +62 851-7113-2802
         {Style.RESET_ALL}"""
     arg = argparse.ArgumentParser()
     arg.add_argument(
