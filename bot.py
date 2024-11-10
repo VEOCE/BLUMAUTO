@@ -3,6 +3,7 @@ import re
 import sys
 import json
 import anyio
+from payload import get_payload
 import httpx
 import random
 import uuid
@@ -319,7 +320,7 @@ class BlumTod:
                 end_farming = farming.get("endTime")
                 if timestamp > (end_farming / 1000):
                     res_ = await self.http(farming_claim_url, self.headers, "")
-                    if res_.status_code != 200:
+                    if res_ and res_.status_code != 200:
                         self.log(f"{red}failed claim farming !")
                     else:
                         self.log(f"{green}success claim farming !")
@@ -363,31 +364,25 @@ class BlumTod:
             claim_url = "https://game-domain.blum.codes/api/v2/game/claim"
             dogs_url = 'https://game-domain.blum.codes/api/v2/game/eligibility/dogs_drop'
 
-            #проверяем - доступен ли сервер декодирования
-            try:
+            game = True
+            # try:
+            #     random_uuid = str(uuid.uuid4())
+            #     point = random.randint(self.cfg.low, self.cfg.high)
+            #     data = await get_payload(gameId=random_uuid, points=point, freeze=None)
+            #
+            #     if "payload" in data:
+            #         self.log(f"{green}Games available right now!")
+            #         game = True
+            #
+            #     else:
+            #         self.log(f"{red}Failed start games - {e}")
+            #         self.log(f"{red}Install node.js!")
+            #         game = False
+            # except Exception as e:
+            #     self.log(f"{red}Failed start games - {e}")
+            #     self.log(f"{red}Install node.js!")
+            #     game = False
 
-                PAYLOAD_SERVER_URL = "https://server2.ggtog.live/api/game"
-                random_uuid = str(uuid.uuid4())
-                points = random.randint(self.cfg.low, self.cfg.high)
-                payload_data = {'gameId': random_uuid,
-                                'points': str(points),
-                                "dogs": 0}
-                resp = requests.post(PAYLOAD_SERVER_URL, json=payload_data)
-                data = resp.json()
-
-                if "payload" in data:
-                    self.log(f"{green}Games available right now!")
-                    game = True
-
-                else:
-                    self.log(f"{red}Failed start games - {e}")
-                    self.log(f"{red}Games are not available right now!")
-                    game = False
-
-            except Exception as e:
-                self.log(f"{red}Failed start games - {e}")
-                self.log(f"{red}Games are not available right now!")
-                game = False
 
 
             while game:
@@ -439,21 +434,21 @@ class BlumTod:
                             self.error(f"Failed elif dogs, error: {e}")
                             eligible = None
 
+                        freeze_count = random.randint(*[4, 8])
                         #создаем payload
                         if eligible:
                             dogs = random.randint(25, 30) * 5
                             self.log(f'dogs = {dogs}')
-                            payload = await self.create_payload(game_id=game_id, points=point,
-                                                             dogs=dogs)
+                            # payload = await self.create_payload(game_id=game_id, points=point,dogs=dogs)
+                            payload = await get_payload(gameId=game_id, points=point, freeze=freeze_count)
                         else:
-                            payload = await self.create_payload(game_id=game_id, points=point,
-                                                             dogs=0)
+                            # payload = await self.create_payload(game_id=game_id, points=point,dogs=0)
+                            payload = await get_payload(gameId=game_id, points=point,freeze=freeze_count)
 
-                        await countdown(random.randint(31, 40))
+                        await countdown(30 + freeze_count * 5)
 
                         res = await self.http(claim_url, self.headers, payload)
-
-                        if "OK" in res.text:
+                        if res and "OK" in res.text:
                             self.log(
                                 f"{green}success earn {white}{point}{green} from game !"
                             )
@@ -472,6 +467,7 @@ class BlumTod:
 
     async def solve(self, task: dict):
         task_id = task.get("id")
+        answers_local = json.loads(open("answers.json").read())
         task_title = task.get("title")
         task_status = task.get("status")
         task_type = task.get("type")
@@ -510,15 +506,16 @@ class BlumTod:
                 verify_url = (
                     f"https://earn-domain.blum.codes/api/v1/tasks/{task_id}/validate"
                 )
-                # answer_url = "https://akasakaid.github.io/blum/answer.json"
-                answer_url = "https://raw.githubusercontent.com/boytegar/BlumBOT/d55dcc033e508ee8dc10218f72f7ac369de1039f/verif.json"
+                answer_url = "https://raw.githubusercontent.com/artlmrx1/artlmrx1.github.io/aeb2f728cc9b41bad90584ef498fe8dd169b825a/answer.json"
                 res_ = await self.http(answer_url, {"User-Agent": "Marin Kitagawa"})
                 answers = res_.json()
                 answer = answers.get(task_id)
                 if not answer:
-                    self.log(f"{yellow}answers to quiz tasks are not yet available.")
-                    break
-                    return
+                    answer = answers_local.get(task_id)
+                    if not answer:
+                        self.log(f"{yellow}answers to quiz tasks are not yet available.")
+                        break
+                        return
                 data = {"keyword": answer}
                 res = await self.http(verify_url, self.headers, json.dumps(data))
                 if res:
@@ -558,9 +555,13 @@ async def get_data(data_file, proxy_file):
 
 
 async def main():
-    init()
-    banner = f"""{Fore.GREEN}
-        {Style.RESET_ALL}"""
+    banner = f"""
+  ░█████╗░██╗░░░██╗████████╗░█████╗░
+  ██╔══██╗██║░░░██║╚══██╔══╝██╔══██╗
+  ███████║██║░░░██║░░░██║░░░██║░░██║
+  ██╔══██║██║░░░██║░░░██║░░░██║░░██║
+  ██║░░██║╚██████╔╝░░░██║░░░╚█████╔╝
+  ╚═╝░░╚═╝░╚═════╝░░░░╚═╝░░░░╚════╝░        """
     arg = argparse.ArgumentParser()
     arg.add_argument(
         "--data",
@@ -623,18 +624,18 @@ async def main():
             )
         datas, proxies = await get_data(data_file=args.data, proxy_file=args.proxy)
         menu = f"""
-{white}VERIFIED ACCOUNT :{green} {args.data}
-{white}PROXY DETECTION :{green} {args.proxy}
-{green}ACCOUNT :{white} {len(datas)}
-{green}PROXY  :{white} {len(proxies)}
+{white}data file :{green} {args.data}
+{white}proxy file :{green} {args.proxy}
+{green}total data :{white} {len(datas)}
+{green}total proxy :{white} {len(proxies)}
 
-    {green}1{white}.{green}) {white}SET AUTO CLAIM MODE ON/OFF ({(green + "Activated" if config.auto_claim else red + "non-active")})
-    {green}2{white}.{green}) {white}SET ON/OFF AUTO CLAIM TASK ({(green + "Activated" if config.auto_task else red + "non-active")})
-    {green}3{white}.{green}) {white}SET ON/OFF AUTO PLAY GAME ({(green + "Activated" if config.auto_game else red + "non-active")})
-    {green}4{white}.{green}) {white}SET GAME POINTS {green}({config.low}-{config.high})
-    {green}5{white}.{green}) {white}SET WAIT TIME BEFORE STARTS {green}({config.clow}-{config.chigh})
-    {green}6{white}.{green}) {white}START BOT(MULTI MODE CLAIM)
-    {green}7{white}.{green}) {white}START BOT ( MIX MODE CLAIM )
+    {green}1{white}.{green}) {white}set on/off auto claim ({(green + "active" if config.auto_claim else red + "non-active")})
+    {green}2{white}.{green}) {white}set on/off auto solve task ({(green + "active" if config.auto_task else red + "non-active")})
+    {green}3{white}.{green}) {white}set on/off auto play game ({(green + "active" if config.auto_game else red + "non-active")})
+    {green}4{white}.{green}) {white}set game point {green}({config.low}-{config.high})
+    {green}5{white}.{green}) {white}set wait time before start {green}({config.clow}-{config.chigh})
+    {green}6{white}.{green}) {white}start bot (multiprocessing)
+    {green}7{white}.{green}) {white}start bot (sync mode)
         """
         #{green}3{white}.{green}) {white}set on/off auto play game ({(green + "active" if config.auto_game else red + "non-active")})
         #{green}3{white}.{green}) {white}set on/off auto play game ({(red + "games are not available right now!")})
